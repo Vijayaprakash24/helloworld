@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link rel="stylesheet" href="script.js"> <!-- Link to external CSS -->
+
+  <style>
+    /* Define the size of the maps */
+    .map {
+      height: 590px;
+      width: 101%;
+      margin-bottom:20px;
+    }
+
+    /* Style for distance information */
+    .distance {
+      margin: 10px;
+      font-size: 18px;
+      text-align: center;
+    }
+
+    /* Modal styles */
+    .modal {
+      display: none;
+      position: fixed;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      padding: 20px;
+      background-color: white;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      border-radius: 8px;
+      z-index: 1000;
+    }
+
+    .modal.active {
+      display: block;
+    }
+
+    .modal button {
+      margin: 10px;
+      padding: 10px 20px;
+      background-color: #007bff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+    }
+
+    .modal button:hover {
+      background-color: #0056b3;
+    }
+
+    /* Overlay style for the modal */
+    .overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+
+    .overlay.active {
+      display: block;
+    }
+  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ambulance and Hospital Route Map</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+</head>
+<body>
+
+  <h3>Route to Selected Ambulance and Hospitals</h3>
+  <div id="ambulanceMap" class="map"></div>
+  <div id="ambulanceDistance" class="distance"></div>
+
+  <!-- Modal for hospital selection -->
+  <div id="hospitalModal" class="modal">
+    <h3 id="hospitalName">Select an Option for the Hospital</h3>
+    <div>
+      <!-- Two options for the user -->
+      <input type="radio" id="option1" name="hospitalOption" value="ACCIDENT">
+      <label for="option1">Option 1: ACCIDENT</label><br>
+
+      <input type="radio" id="option2" name="hospitalOption" value="HEART ATTACK">
+      <label for="option2">Option 2: HEART ATTACK</label><br><br>
+
+      <button id="submitHospitalSelection">Submit</button>
+      <button id="cancelHospital">Cancel</button>
+    </div>
+  </div>
+  <div id="modalOverlay" class="overlay"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+
+  <script>
+    // Initialize the ambulance route map
+    const ambulanceMap = L.map('ambulanceMap').setView([20.5937, 78.9629], 5); // Centered on India by default
+
+    // Add OpenStreetMap tile layer for ambulance map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(ambulanceMap);
+
+    // Retrieve user and ambulance locations from localStorage
+    const userLat = parseFloat(localStorage.getItem('userLat'));
+    const userLng = parseFloat(localStorage.getItem('userLng'));
+    const ambulanceLat = parseFloat(localStorage.getItem('ambulanceLat'));
+    const ambulanceLng = parseFloat(localStorage.getItem('ambulanceLng'));
+
+    // Check if the locations are available
+    if (userLat && userLng && ambulanceLat && ambulanceLng) {
+      // Display user marker
+      const userMarker = L.marker([userLat, userLng]).addTo(ambulanceMap);
+      userMarker.bindPopup('<b>You are here!</b>').openPopup();
+
+      // Display ambulance marker
+      const ambulanceMarker = L.marker([ambulanceLat, ambulanceLng]).addTo(ambulanceMap);
+      ambulanceMarker.bindPopup('<b>Ambulance Location</b>').openPopup();
+
+      // Calculate the distance and show it
+      const distance = haversine(userLat, userLng, ambulanceLat, ambulanceLng);
+      document.getElementById('ambulanceDistance').innerText = `Distance to ambulance: ${distance.toFixed(2)} km`;
+
+      // Show the route from user to ambulance
+      L.Routing.control({
+        waypoints: [
+          L.latLng(userLat, userLng),
+          L.latLng(ambulanceLat, ambulanceLng)
+        ],
+        routeWhileDragging: true
+      }).addTo(ambulanceMap);
+
+      // Hospital Data
+      const hospitals = [
+        { id: 1, lat: 19.076, lng: 72.8777, name: 'Hospital 1' },
+        { id: 2, lat: 28.6139, lng: 77.209, name: 'Hospital 2' },
+        { id: 3, lat: 13.0827, lng: 80.2707, name: 'Hospital 3' }
+      ];
+
+      // Display hospital markers
+      hospitals.forEach(hospital => {
+        const hospitalMarker = L.marker([hospital.lat, hospital.lng]).addTo(ambulanceMap);
+        hospitalMarker.bindPopup(`<b>${hospital.name}</b><br><button onclick="showHospitalModal('${hospital.name}')">Select</button>`);
+      });
+
+    } else {
+      alert('Location data not found!');
+    }
+
+    // Haversine formula for calculating distance between two points in km
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371; // Radius of the Earth in kilometers
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLon / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    // Show hospital selection modal
+    function showHospitalModal(hospitalName) {
+      const modal = document.getElementById('hospitalModal');
+      const overlay = document.getElementById('modalOverlay');
+      const hospitalNameEl = document.getElementById('hospitalName');
+      hospitalNameEl.textContent = `Select an Option for ${hospitalName}`;
+      modal.classList.add('active');
+      overlay.classList.add('active');
+    }
+
+    // Submit hospital selection
+    document.getElementById('submitHospitalSelection').onclick = () => {
+      const selectedOption = document.querySelector('input[name="hospitalOption"]:checked');
+      if (selectedOption) {
+        // Handle the selected option here (e.g., submit data, redirect, etc.)
+        alert(`You selected: ${selectedOption.value}`);
+        closeModal();
+      } else {
+        alert('Please select an option before submitting.');
+      }
+    };
+
+    // Cancel button closes modal
+    document.getElementById('cancelHospital').onclick = () => {
+      closeModal();
+    };
+
+    // Hide modal
+    function closeModal() {
+      const modal = document.getElementById('hospitalModal');
+      const overlay = document.getElementById('modalOverlay');
+      modal.classList.remove('active');
+      overlay.classList.remove('active');
+    }
+  </script>
+
+</body>
+</html>

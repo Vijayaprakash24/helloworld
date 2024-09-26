@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <style>
+          /* styles.css */
+
+/* Define the size of the maps */
+.map {
+  height: 500px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+/* Style for distance information */
+.distance {
+  margin: 10px;
+  font-size: 18px;
+  text-align: center;
+}
+
+/* Style for buttons */
+.buttons {
+  margin: 10px;
+  text-align: center;
+}
+.buttons button {
+  padding: 10px 20px;
+  
+  </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ambulance Route Map</title>
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+
+  <link rel="stylesheet" href="styles.css"> <!-- Link to external CSS -->
+</head>
+<body>
+
+  <h3>Route to Selected Ambulance</h3>
+  <div id="ambulanceMap" class="map"></div>
+  <div id="ambulanceDistance" class="distance"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+  <script src="script.js"></script> <!-- Link to external JavaScript -->
+
+  <script>
+    // Initialize the ambulance route map
+    const ambulanceMap = L.map('ambulanceMap').setView([20.5937, 78.9629], 5); // Centered on India by default
+
+    // Add OpenStreetMap tile layer for ambulance map
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    }).addTo(ambulanceMap);
+
+    // Retrieve user and ambulance locations from localStorage
+    const userLat = parseFloat(localStorage.getItem('userLat'));
+    const userLng = parseFloat(localStorage.getItem('userLng'));
+    const ambulanceLat = parseFloat(localStorage.getItem('ambulanceLat'));
+    const ambulanceLng = parseFloat(localStorage.getItem('ambulanceLng'));
+
+    // Check if the locations are available
+    if (userLat && userLng && ambulanceLat && ambulanceLng) {
+      // Display user marker
+      const userMarker = L.marker([userLat, userLng]).addTo(ambulanceMap);
+      userMarker.bindPopup('<b>You are here!</b>').openPopup();
+
+      // Display ambulance marker
+      const ambulanceMarker = L.marker([ambulanceLat, ambulanceLng]).addTo(ambulanceMap);
+      ambulanceMarker.bindPopup('<b>Ambulance Location</b>').openPopup();
+
+      // Calculate the distance and show it
+      const distance = haversine(userLat, userLng, ambulanceLat, ambulanceLng);
+      document.getElementById('ambulanceDistance').innerText = `Distance to ambulance: ${distance.toFixed(2)} km`;
+
+      // Show the route from user to ambulance
+      L.Routing.control({
+        waypoints: [
+          L.latLng(userLat, userLng),
+          L.latLng(ambulanceLat, ambulanceLng)
+        ],
+        routeWhileDragging: true
+      }).addTo(ambulanceMap);
+      
+    } else {
+      
+       // Redirect back to user map if locations are not found
+    }
+  </script>
+
+</body>
+</html>
